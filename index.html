@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gloria Eterna</title>
+<style>
+  :root{
+    --bg:#0b111b; --panel:#141c2c; --panel2:#1b2639; --line:#27344d; --text:#e8ecf4; --muted:#8d9bb5;
+    --gold:#e8c15a; --gold2:#b8902f; --good:#5fd08a; --bad:#ff6b6b; --blue:#5aa9e6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  h1,h2,h3{font-family:Georgia,'Times New Roman',serif;margin:0;font-weight:700}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;transition:.12s}
+  button:hover:not(:disabled){border-color:var(--gold);background:#22304a}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:linear-gradient(#e8c15a,#c9a03f);color:#1a1405;border-color:#e8c15a;font-weight:700}
+  button.primary:hover:not(:disabled){background:linear-gradient(#f3d27a,#d9b04c)}
+  input{font:inherit;color:var(--text);background:#0e1624;border:1px solid var(--line);border-radius:8px;padding:9px 12px;outline:none}
+  input:focus{border-color:var(--gold)}
+  .hidden{display:none!important}
+
+  /* lobby */
+  #lobby,#over{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 700px at 50% -10%,#1d2c4a 0%,#0b111b 60%);z-index:20;padding:16px}
+  #over{background:rgba(5,8,14,.78);backdrop-filter:blur(3px);z-index:30}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(520px,100%);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .card h1{font-size:34px;color:var(--gold);letter-spacing:.5px}
+  .card .sub{color:var(--muted);margin:4px 0 20px}
+  .row{display:flex;gap:8px;align-items:center}
+  .plist{margin:14px 0;display:flex;flex-direction:column;gap:6px}
+  .pitem{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+  .dot{width:12px;height:12px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.7)}
+  .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-left:auto}
+  .addr{background:#0e1624;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:14px;color:var(--muted);font-size:13px}
+  .addr b{color:var(--text);user-select:all}
+  .rules{color:var(--muted);font-size:13px;margin-top:14px;line-height:1.5}
+
+  /* juego */
+  #game{position:fixed;inset:0}
+  canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+  canvas.dragging{cursor:grabbing}
+  #hud{position:absolute;left:0;right:320px;top:0;display:flex;gap:12px;align-items:center;padding:8px 12px;
+    background:linear-gradient(rgba(11,17,27,.92),rgba(11,17,27,0));pointer-events:none}
+  #hud>*{pointer-events:auto}
+  #turn{font-family:Georgia,serif;font-size:20px;color:var(--gold);white-space:nowrap}
+  #chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+  .chip{display:flex;align-items:center;gap:6px;background:rgba(20,28,44,.9);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 6px;font-size:13px}
+  .chip.me{border-color:var(--gold)}
+  .chip.dead{opacity:.45;text-decoration:line-through}
+  #hover{position:absolute;left:12px;top:52px;background:rgba(20,28,44,.88);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--muted);pointer-events:none}
+  #panel{position:absolute;right:0;top:0;bottom:0;width:320px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  #panelBody{flex:1;overflow:auto;padding:14px}
+  #panelFoot{padding:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;background:var(--panel)}
+  #panelFoot button{width:100%;padding:10px}
+  #endTurn{font-size:16px}
+  #log{position:absolute;left:12px;bottom:12px;width:min(420px,calc(100% - 350px));max-height:150px;overflow:auto;background:rgba(14,20,32,.88);
+    border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;color:#c4cde0}
+  #log .t{color:var(--muted);margin-right:6px}
+  #log div{padding:1px 0}
+  #toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);background:#3a1620;border:1px solid var(--bad);color:#ffd9d9;padding:8px 14px;border-radius:10px;z-index:10;opacity:0;transition:opacity .2s;pointer-events:none}
+  #toast.show{opacity:1}
+
+  /* panel */
+  .ptitle{display:flex;align-items:center;gap:10px}
+  .ptitle .ico{font-size:30px}
+  .ptitle h2{font-size:20px;line-height:1.1}
+  .ptitle small{display:block;color:var(--muted);font-family:system-ui;font-weight:400;font-size:12px}
+  .rank{display:inline-block;margin:8px 0 6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;color:#1a1405;background:linear-gradient(#f3d27a,#c9a03f)}
+  .bar{height:10px;border-radius:6px;background:#0b111b;border:1px solid var(--line);overflow:hidden;position:relative}
+  .bar>i{display:block;height:100%}
+  .barlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:8px 0 3px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}
+  .stat{gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between}
+  .stat span{color:var(--muted)}
+  .sec{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .pts{background:var(--gold);color:#1a1405;border-radius:999px;padding:1px 9px;font-weight:800;letter-spacing:0}
+  .pts.zero{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  .promo{display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 10px}
+  .promo .n{display:flex;justify-content:space-between;font-weight:700}
+  .promo .n b{color:var(--gold)}
+  .promo .d{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .promo.glow:not(:disabled){border-color:var(--gold);box-shadow:0 0 0 1px rgba(232,193,90,.25) inset}
+  .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .btns button{flex:1}
+  .prod{display:block;width:100%;text-align:left;margin-bottom:6px}
+  .prod.on{border-color:var(--gold);background:#2a2a1e}
+  .prod .n{display:flex;justify-content:space-between}
+  .prod .d{color:var(--muted);font-size:12px}
+  .hint{color:var(--muted);font-size:12.5px;line-height:1.5}
+  .primary kbd{background:rgba(26,20,5,.18);border-color:rgba(26,20,5,.45);color:#1a1405}
+  kbd{background:#0e1624;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <div class="card">
+    <h1>Gloria Eterna</h1>
+    <div class="sub">Estrategia por turnos donde tus unidades crecen hasta ser leyendas.</div>
+
+    <div id="joinBox">
+      <div class="row">
+        <input id="nameIn" placeholder="Tu nombre" maxlength="16" style="flex:1">
+        <button id="joinBtn" class="primary">Unirse</button>
+      </div>
+      <div id="joinErr" style="color:var(--bad);margin-top:8px"></div>
+    </div>
+
+    <div id="roomBox" class="hidden">
+      <div class="plist" id="plist"></div>
+      <div class="row" id="hostBtns">
+        <button id="addBot">+ Bot</button>
+        <button id="rmBot">− Bot</button>
+        <button id="startBtn" class="primary" style="margin-left:auto">Empezar partida</button>
+      </div>
+      <div id="waitHost" class="hint hidden">Esperando a que el anfitrión empiece la partida…</div>
+    </div>
+
+    <div class="addr" id="addr">Cargando direcciones…</div>
+    <div class="rules">
+      <b style="color:var(--text)">Cómo se juega:</b> funda ciudades con colonos, produce tropas y conquista las ciudades rivales.
+      Cada unidad gana XP al combatir y sobrevivir; cada nivel da un punto de promoción <b>sin límite</b>:
+      más ataque, defensa, vida, regeneración, doble golpe, auras de mando… ¡Un guerrero veterano puede volverse imparable!
+      Los turnos son simultáneos: todos mueven a la vez y el turno pasa cuando todos pulsan «Terminar turno».
+    </div>
+  </div>
+</div>
+
+<div id="game" class="hidden">
+  <canvas id="map"></canvas>
+  <div id="hud">
+    <div id="turn">Turno 1</div>
+    <div id="chips"></div>
+  </div>
+  <div id="hover" class="hidden"></div>
+  <div id="log"></div>
+  <div id="toast"></div>
+  <div id="panel">
+    <div id="panelBody"></div>
+    <div id="panelFoot">
+      <button id="nextUnit">Siguiente unidad <kbd>Espacio</kbd></button>
+      <button id="endTurn" class="primary">Terminar turno <kbd>Enter</kbd></button>
+    </div>
+  </div>
+</div>
+
+<div id="over" class="hidden">
+  <div class="card" style="text-align:center">
+    <h1 id="overTitle">Fin de la partida</h1>
+    <div class="sub" id="overSub"></div>
+    <button id="backLobby" class="primary hidden">Volver al lobby</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const EMOJI = { warrior: '⚔️', archer: '🏹', horse: '🐎', settler: '🏕️' };
+const SQ3 = Math.sqrt(3), R0 = 34;
+
+let cfg = null, token = localStorage.getItem('gloria_token'), es = null;
+let S = null, me = -1;
+let sel = null;                 // {kind:'unit'|'city', id, enemy?:bool}
+let reach = new Set(), targets = new Set();
+let cam = { x: 0, y: 0, z: 1 }, camSet = false;
+let hover = null, dirty = true, qid = 0, lastFx = -1;
+const floats = [];
+const seenCities = new Map();
+
+// ---------------------------------------------------------- red
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let d = {}; try { d = await r.json(); } catch {}
+  return Object.assign({ status: r.status }, d);
+}
+function act(m) {
+  post('/api/act', Object.assign({ token }, m)).then(d => { if (d.error) toast(d.error); });
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function boot() {
+  cfg = await (await fetch('/api/cfg')).json();
+  try {
+    const info = await (await fetch('/api/info')).json();
+    const here = location.origin;
+    const others = info.addresses.filter(a => a !== here);
+    $('#addr').innerHTML = 'Invita a tus amigos (misma red wifi) a: ' +
+      (info.addresses.length ? info.addresses.map(a => '<b>' + a + '</b>').join(' · ') : '<b>' + here + '</b>') +
+      '<br>Para jugar por internet usa un túnel (mira LEEME.md).';
+  } catch { $('#addr').textContent = ''; }
+  $('#nameIn').value = localStorage.getItem('gloria_name') || '';
+  if (token) connect();
+}
+$('#joinBtn').onclick = join;
+$('#nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+async function join() {
+  const name = $('#nameIn').value.trim() || 'Jugador';
+  localStorage.setItem('gloria_name', name);
+  const d = await post('/api/join', { name, token });
+  if (d.error) { $('#joinErr').textContent = d.error; return; }
+  token = d.token; localStorage.setItem('gloria_token', token); connect();
+}
+function connect() {
+  if (es) es.close();
+  es = new EventSource('/api/events?token=' + encodeURIComponent(token));
+  es.onmessage = (e) => { S = JSON.parse(e.data); onState(); };
+  es.onerror = () => {
+    if (es.readyState === 2) { // sesión inválida (servidor reiniciado)
+      localStorage.removeItem('gloria_token'); token = null; S = null;
+      $('#game').classList.add('hidden'); $('#over').classList.add('hidden'); $('#lobby').classList.remove('hidden');
+      $('#joinBox').classList.remove('hidden'); $('#roomBox').classList.add('hidden');
+    }
+  };
+}
+$('#addBot').onclick = () => act({ type: 'addbot' });
+$('#rmBot').onclick = () => act({ type: 'removebot' });
+$('#startBtn').onclick = () => act({ type: 'start' });
+$('#backLobby').onclick = () => act({ type: 'reset' });
+$('#endTurn').onclick = endTurn;
+$('#nextUnit').onclick = nextUnit;
+function endTurn() { if (S && S.phase === 'playing') { sel = null; reach.clear(); targets.clear(); act({ type: 'endturn' }); } }
+
+// ---------------------------------------------------------- estado
+function me_() { return S.players[me]; }
+function unitById(id) { return S.units.find(u => u.id === id); }
+function cityById(id) { return S.cities.find(c => c.id === id) || seenCities.get(id); }
+
+function onState() {
+  me = S.you;
+  if (S.phase === 'lobby') { renderLobby(); sel = null; camSet = false; seenCities.clear(); lastFx = -1; return; }
+  $('#lobby').classList.add('hidden'); $('#game').classList.remove('hidden');
+  if (!camSet) {
+    const c = S.cities.find(c => c.owner === me) || S.cities[0];
+    if (c) { const [wx, wy] = hexCenter(c.x, c.y); cam.x = wx; cam.y = wy; camSet = true; resize(); }
+  }
+  for (const c of S.cities) seenCities.set(c.id, Object.assign({}, c));
+  for (const [id, c] of seenCities) { // ciudades que ya no existen / cambiaron de dueño visibles
+    const vis = S.v[c.y * S.W + c.x] === '2'; if (vis && !S.cities.some(x => x.id === id)) seenCities.delete(id);
+  }
+  // efectos flotantes
+  const mx = S.fx.reduce((a, f) => Math.max(a, f.id), -1);
+  if (lastFx < 0) lastFx = mx; else for (const f of S.fx) if (f.id > lastFx) floats.push(Object.assign({ t0: performance.now() }, f));
+  lastFx = Math.max(lastFx, mx);
+  // selección consistente
+  if (sel) {
+    if (sel.kind === 'unit' && !unitById(sel.id)) sel = null;
+    else if (sel.kind === 'city' && !cityById(sel.id)) sel = null;
+  }
+  refreshQuery();
+  renderHud(); renderPanel(); renderLog(); renderOver();
+  dirty = true;
+}
+
+function renderLobby() {
+  $('#game').classList.add('hidden'); $('#over').classList.add('hidden'); $('#lobby').classList.remove('hidden');
+  $('#joinBox').classList.add('hidden'); $('#roomBox').classList.remove('hidden');
+  $('#plist').innerHTML = S.players.map(p => `<div class="pitem"><span class="dot" style="background:${p.color}"></span>
+    <b>${esc(p.name)}</b>${p.id === me ? ' <span style="color:var(--gold)">(tú)</span>' : ''}
+    <span class="tag">${p.isBot ? 'bot' : (p.id === 0 ? 'anfitrión' : (p.connected ? 'conectado' : 'desconectado'))}</span></div>`).join('');
+  const host = me === 0;
+  $('#hostBtns').classList.toggle('hidden', !host); $('#waitHost').classList.toggle('hidden', host);
+  $('#startBtn').disabled = S.players.length < 2;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function renderOver() {
+  const o = $('#over');
+  if (S.phase !== 'over') { o.classList.add('hidden'); return; }
+  o.classList.remove('hidden');
+  const w = S.players[S.winner];
+  $('#overTitle').textContent = !w ? 'Empate' : (w.id === me ? '¡Victoria!' : 'Derrota');
+  $('#overTitle').style.color = w && w.id === me ? 'var(--gold)' : 'var(--bad)';
+  $('#overSub').textContent = w ? (w.id === me ? 'Has conquistado el mundo en el turno ' + S.turn + '.' : w.name + ' ha ganado la partida (turno ' + S.turn + ').') : '';
+  $('#backLobby').classList.toggle('hidden', me !== 0);
+  if (me !== 0) $('#overSub').textContent += ' Espera a que el anfitrión reinicie.';
+}
+
+function renderHud() {
+  $('#turn').textContent = 'Turno ' + S.turn;
+  $('#chips').innerHTML = S.players.map(p => `<div class="chip ${p.id === me ? 'me' : ''} ${p.alive ? '' : 'dead'}">
+    <span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.alive ? (p.ended ? ' ✓' : (p.connected ? '' : ' 📴')) : ' ☠'}</div>`).join('');
+  const m = me_(), idle = idleUnits().length;
+  $('#endTurn').disabled = !m.alive || m.ended || S.phase !== 'playing';
+  $('#endTurn').innerHTML = m.ended ? 'Esperando a los demás…' : 'Terminar turno <kbd>Enter</kbd>';
+  $('#nextUnit').disabled = !idle;
+  $('#nextUnit').innerHTML = `Siguiente unidad (${idle}) <kbd>Espacio</kbd>`;
+}
+function renderLog() {
+  const el = $('#log'); const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+  el.innerHTML = S.log.slice(-14).map(l => `<div><span class="t">T${l.t}</span>${esc(l.m)}</div>`).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function idleUnits() { return S.units.filter(u => u.owner === me && ((u.moves > 0 && !u.fort && !u.goto) || u.pts > 0)); }
+let cycle = 0;
+function nextUnit() {
+  const list = idleUnits(); if (!list.length) return;
+  const i = list.findIndex(u => sel && sel.kind === 'unit' && sel.id === u.id);
+  const u = list[(i + 1 + (i < 0 ? cycle : 0)) % list.length]; cycle = 0;
+  select({ kind: 'unit', id: u.id }); centerOn(u.x, u.y);
+}
+function centerOn(x, y) { const [wx, wy] = hexCenter(x, y); cam.x = wx; cam.y = wy; dirty = true; }
+
+function select(s) { sel = s; reach.clear(); targets.clear(); refreshQuery(); renderPanel(); dirty = true; }
+async function refreshQuery() {
+  reach = new Set(); targets = new Set();
+  if (!sel || sel.kind !== 'unit') return;
+  const u = unitById(sel.id); if (!u || u.owner !== me || S.phase !== 'playing' || me_().ended) return;
+  const id = ++qid;
+  const d = await post('/api/query', { token, unitId: u.id });
+  if (id !== qid) return;
+  reach = new Set(d.reach || []); targets = new Set(d.targets || []); dirty = true;
+}
+
+// ---------------------------------------------------------- panel
+function bar(v, max, color) { return `<div class="bar"><i style="width:${Math.max(0, Math.min(100, v / max * 100))}%;background:${color}"></i></div>`; }
+function hpColor(f) { return f > .6 ? '#5fd08a' : f > .3 ? '#f4c542' : '#ff6b6b'; }
+
+function promoBlock(u) {
+  const rows = Object.entries(cfg.PROMOS).map(([k, P]) => {
+    const r = (u.promos && u.promos[k]) || 0; let dis = '';
+    if (u.pts <= 0) dis = 'x';
+    else if (r >= P.max) dis = 'Máximo';
+    else if (k === 'reach' && cfg.UNIT_TYPES[u.type].range <= 0) dis = 'Solo a distancia';
+    else if (k === 'double' && (u.promos.atk || 0) < 3) dis = 'Requiere Ferocidad 3';
+    const extra = dis && dis !== 'x' ? ` — <i style="color:var(--bad)">${dis}</i>` : '';
+    if (k === 'reach' && cfg.UNIT_TYPES[u.type].range <= 0) return '';
+    return `<button class="promo ${u.pts > 0 && !dis ? 'glow' : ''}" data-a="promote" data-k="${k}" ${dis ? 'disabled' : ''}>
+      <span class="n"><span>${P.name}</span><b>${r ? 'Rango ' + r : ''}</b></span><span class="d">${P.desc}${extra}</span></button>`;
+  }).join('');
+  return `<div class="sec">Promociones <span class="pts ${u.pts ? '' : 'zero'}">${u.pts} pts</span></div>${rows}`;
+}
+
+function renderPanel() {
+  const el = $('#panelBody');
+  if (!S || S.phase === 'lobby') return;
+  if (!sel) {
+    el.innerHTML = `<div class="ptitle"><span class="ico">🏛️</span><h2>Gloria Eterna<small>Tu imperio</small></h2></div>
+      <p class="hint">Haz clic en una unidad o ciudad para seleccionarla.<br><br>
+      <b>Mover:</b> clic en una casilla resaltada (o más lejos: la unidad seguirá el camino en los próximos turnos).<br>
+      <b>Atacar:</b> clic en un enemigo marcado en rojo.<br>
+      <b>XP:</b> se gana combatiendo, conquistando y sobreviviendo. Cada nivel da 1 punto de promoción, sin límite.<br><br>
+      <kbd>Espacio</kbd> siguiente unidad · <kbd>F</kbd> fundar ciudad · <kbd>H</kbd> ir a tu capital · rueda del ratón para zoom · arrastra para mover el mapa.</p>
+      ${ownSummary()}`;
+    return;
+  }
+  if (sel.kind === 'unit') {
+    const u = unitById(sel.id); if (!u) { el.innerHTML = ''; return; }
+    const T = cfg.UNIT_TYPES[u.type], own = u.owner === me, col = S.players[u.owner].color;
+    let h = `<div class="ptitle"><span class="ico">${EMOJI[u.type]}</span><h2>${esc(u.name)}<small>${T.name} de <span style="color:${col}">${esc(S.players[u.owner].name)}</span></small></h2></div>
+      <div class="rank">${u.title} · Nivel ${u.level}</div>
+      <div class="barlbl"><span>Vida</span><span>${u.hp} / ${u.hpMax}</span></div>${bar(u.hp, u.hpMax, hpColor(u.hp / u.hpMax))}`;
+    if (own && !T.civil) h += `<div class="barlbl"><span>Experiencia</span><span>${u.xp} / ${u.need}</span></div>${bar(u.xp, u.need, '#5aa9e6')}`;
+    if (!T.civil) {
+      h += `<div class="stats">
+        <div class="stat"><span>Ataque</span><b>${u.atk}</b></div><div class="stat"><span>Defensa</span><b>${u.def}</b></div>
+        <div class="stat"><span>Movimiento</span><b>${own ? u.moves + '/' : ''}${u.mv}</b></div>
+        <div class="stat"><span>Alcance</span><b>${u.range || 'Melé'}</b></div>
+        ${own ? `<div class="stat"><span>Ataques</span><b>${u.attacks}/${u.attacksMax}</b></div><div class="stat"><span>Bajas</span><b>${u.kills}</b></div>` : ''}</div>`;
+    } else h += `<div class="stats"><div class="stat"><span>Movimiento</span><b>${own ? u.moves + '/' : ''}${u.mv}</b></div><div class="stat"><span>Defensa</span><b>${u.def}</b></div></div>`;
+    if (own) {
+      const b = [];
+      if (u.type === 'settler') b.push(`<button class="primary" data-a="found" ${u.foundErr !== true ? 'disabled title="' + esc(u.foundErr || '') + '"' : ''}>Fundar ciudad <kbd>F</kbd></button>`);
+      if (!T.civil) b.push(`<button data-a="fortify" ${u.moves <= 0 ? 'disabled' : ''}>Fortificar</button>`);
+      h += `<div class="btns">${b.join('')}</div>`;
+      if (u.type === 'settler' && u.foundErr !== true) h += `<p class="hint">${esc(u.foundErr)}</p>`;
+      if (u.goto) h += `<p class="hint">Rumbo a (${u.goto.x}, ${u.goto.y}).</p>`;
+      if (!T.civil) h += promoBlock(u);
+    } else h += `<p class="hint">Unidad enemiga. Fuerza actual: ataque ${u.atk}, defensa ${u.def}.</p>`;
+    el.innerHTML = h; return;
+  }
+  const c = cityById(sel.id); if (!c) { el.innerHTML = ''; return; }
+  const own = c.owner === me, col = S.players[c.owner].color;
+  let h = `<div class="ptitle"><span class="ico">🏰</span><h2>${esc(c.name)}<small>Ciudad de <span style="color:${col}">${esc(S.players[c.owner].name)}</span></small></h2></div>
+    <div class="barlbl"><span>Defensas</span><span>${c.hp} / ${c.hpMax}</span></div>${bar(c.hp, c.hpMax, hpColor(c.hp / c.hpMax))}
+    <div class="stats"><div class="stat"><span>Población</span><b>${c.pop}</b></div>${own ? `<div class="stat"><span>Producción</span><b>+${c.perTurn}/turno</b></div>` : ''}</div>`;
+  if (own) {
+    if (c.building) h += `<div class="barlbl"><span>Produciendo: ${cfg.UNIT_TYPES[c.building].name}</span><span>${c.prod} / ${c.cost}</span></div>${bar(c.prod, c.cost, '#e8c15a')}`;
+    h += `<div class="sec">Entrenar (se repite hasta que cambies)</div>`;
+    for (const [k, T] of Object.entries(cfg.UNIT_TYPES)) {
+      const need = Math.max(1, Math.ceil((T.cost - (c.building === k ? c.prod : 0)) / c.perTurn));
+      const dis = k === 'settler' && c.pop < 2;
+      h += `<button class="prod ${c.building === k ? 'on' : ''}" data-a="build" data-u="${k}" ${dis ? 'disabled' : ''}>
+        <span class="n"><span>${EMOJI[k]} ${T.name}</span><b>${T.cost} ⚙</b></span>
+        <span class="d">${T.civil ? 'Funda ciudades (cuesta 1 de población)' : `Ataque ${T.atk} · Def ${T.def} · Mov ${T.mv}${T.range ? ' · Alcance ' + T.range : ''}`} · ~${need} turno${need > 1 ? 's' : ''}${dis ? ' · necesita población 2' : ''}</span></button>`;
+    }
+    h += `<p class="hint">La población crece cada 5 turnos y aumenta producción y defensa. Una unidad en tu ciudad se cura más rápido.</p>`;
+  }
+  el.innerHTML = h;
+}
+function ownSummary() {
+  const mil = S.units.filter(u => u.owner === me && !cfg.UNIT_TYPES[u.type].civil);
+  const best = mil.slice().sort((a, b) => (b.level - a.level) || (b.kills - a.kills)).slice(0, 4);
+  const cities = S.cities.filter(c => c.owner === me).length;
+  let h = `<div class="sec">Resumen</div><div class="stats"><div class="stat"><span>Ciudades</span><b>${cities}</b></div><div class="stat"><span>Tropas</span><b>${mil.length}</b></div></div>`;
+  if (best.length) h += `<div class="sec">Tus mejores unidades</div>` + best.map(u => `<button class="promo" data-a="goto" data-id="${u.id}"><span class="n"><span>${EMOJI[u.type]} ${esc(u.name)}</span><b>Nv ${u.level}</b></span><span class="d">${u.title} · ATK ${u.atk} · DEF ${u.def} · ${u.hp}/${u.hpMax} PV</span></button>`).join('');
+  return h;
+}
+$('#panelBody').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
+  const a = b.dataset.a;
+  if (a === 'promote') act({ type: 'promote', unitId: sel.id, key: b.dataset.k });
+  else if (a === 'found') act({ type: 'found', unitId: sel.id });
+  else if (a === 'fortify') act({ type: 'fortify', unitId: sel.id });
+  else if (a === 'build') act({ type: 'build', cityId: sel.id, unit: b.dataset.u });
+  else if (a === 'goto') { const u = unitById(+b.dataset.id); if (u) { select({ kind: 'unit', id: u.id }); centerOn(u.x, u.y); } }
+});
+
+// ---------------------------------------------------------- mapa / render
+const cv = $('#map'), ctx = cv.getContext('2d');
+let cw = 0, ch = 0, dpr = 1;
+function resize() {
+  dpr = window.devicePixelRatio || 1; const w = $('#game').clientWidth, h = $('#game').clientHeight;
+  if (!w) return; cw = w; ch = h; cv.width = w * dpr; cv.height = h * dpr; dirty = true;
+}
+window.addEventListener('resize', resize);
+function hexCenter(x, y) { return [R0 * SQ3 * (x + 0.5 * (y & 1)), R0 * 1.5 * y]; }
+function w2s(wx, wy) { return [(wx - cam.x) * cam.z + cw / 2 - 160, (wy - cam.y) * cam.z + ch / 2]; }   // -160: centro del área sin panel
+function s2w(sx, sy) { return [(sx + 160 - cw / 2) / cam.z + cam.x, (sy - ch / 2) / cam.z + cam.y]; }
+function pickHex(sx, sy) {
+  const [wx, wy] = s2w(sx, sy);
+  const q = (SQ3 / 3 * wx - wy / 3) / R0, r = (2 / 3 * wy) / R0;
+  let x = q, z = r, y = -x - z, rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+  const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
+  if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry;
+  return [rx + (rz - (rz & 1)) / 2, rz];
+}
+const CORN = [...Array(6)].map((_, i) => { const a = (60 * i - 30) * Math.PI / 180; return [Math.cos(a), Math.sin(a)]; });
+function hexPath(cx, cy, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const [dx, dy] = CORN[i]; const px = cx + dx * r, py = cy + dy * r; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); }
+const TCOL = { w: [208, 48], g: [96, 40], f: [118, 32], h: [44, 36], m: [230, 8] };
+function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function tcolor(t, x, y) { const [h, s] = TCOL[t]; const base = { w: 36, g: 47, f: 31, h: 50, m: 52 }[t]; return `hsl(${h},${s + 10}%,${base + (hash(x, y) - .5) * 6}%)`; }
+
+function draw(now) {
+  if (!S || S.phase === 'lobby' || !cw) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#080c14'; ctx.fillRect(0, 0, cw, ch);
+  const W = S.W, H = S.H, R = R0 * cam.z, me_c = S.players[me].color;
+  const detail = cam.z > 0.55;
+  ctx.lineJoin = 'round';
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = y * W + x, vv = S.v[k]; if (vv === '0') continue;
+    const [wx, wy] = hexCenter(x, y), [cx, cy] = w2s(wx, wy);
+    if (cx < -R * 2 || cy < -R * 2 || cx > cw + R * 2 || cy > ch + R * 2) continue;
+    const t = S.t[k];
+    hexPath(cx, cy, R); ctx.fillStyle = tcolor(t, x, y); ctx.fill();
+    if (detail) drawTerrainDetail(t, x, y, cx, cy, R);
+    ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 1; hexPath(cx, cy, R); ctx.stroke();
+    if (vv === '1') { hexPath(cx, cy, R); ctx.fillStyle = 'rgba(8,12,20,.52)'; ctx.fill(); }
+  }
+  // resaltados
+  const hl = (k, fill, stroke, lw) => {
+    const x = k % W, y = (k / W) | 0, [cx, cy] = w2s(...hexCenter(x, y));
+    hexPath(cx, cy, R * .95); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+  };
+  for (const k of reach) hl(k, 'rgba(255,255,255,.2)', 'rgba(255,255,255,.55)', 1.5);
+  for (const k of targets) hl(k, 'rgba(255,60,60,.38)', '#ff4d4d', 2.5);
+  // ciudades
+  const drawCity = (c, fogged) => {
+    const [cx, cy] = w2s(...hexCenter(c.x, c.y)); const col = S.players[c.owner].color;
+    hexPath(cx, cy, R * .86); ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, 4 * cam.z); ctx.stroke();
+    hexPath(cx, cy, R * .86); ctx.fillStyle = col + '33'; ctx.fill();
+    ctx.font = `${R * .5}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏰', cx - R * .38, cy - R * .5);
+    if (cam.z > .45) {
+      ctx.font = `bold ${Math.max(10, 12 * cam.z)}px system-ui`; const txt = c.name + ' · ' + c.pop;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.strokeText(txt, cx, cy + R * 1.0); ctx.fillStyle = fogged ? '#9aa6bd' : '#fff'; ctx.fillText(txt, cx, cy + R * 1.0);
+    }
+    if (!fogged && c.hp < c.hpMax) { ctx.fillStyle = '#000a'; ctx.fillRect(cx - R * .6, cy + R * .62, R * 1.2, 4); ctx.fillStyle = hpColor(c.hp / c.hpMax); ctx.fillRect(cx - R * .6, cy + R * .62, R * 1.2 * c.hp / c.hpMax, 4); }
+  };
+  const live = new Set(S.cities.map(c => c.id));
+  for (const [id, c] of seenCities) if (!live.has(id) && S.v[c.y * W + c.x] === '1') drawCity(c, true);
+  for (const c of S.cities) drawCity(c, false);
+  // unidades
+  const sorted = S.units.slice().sort((a, b) => (cfg.UNIT_TYPES[a.type].civil ? 0 : 1) - (cfg.UNIT_TYPES[b.type].civil ? 0 : 1));
+  const both = new Set(); const seen = new Set(); for (const u of S.units) { const k = u.y * W + u.x; if (seen.has(k)) both.add(k); seen.add(k); }
+  for (const u of sorted) {
+    const [cx0, cy0] = w2s(...hexCenter(u.x, u.y)); const T = cfg.UNIT_TYPES[u.type]; const col = S.players[u.owner].color;
+    const shared = both.has(u.y * W + u.x); const small = shared && T.civil;
+    const cx = cx0 + (small ? R * .42 : 0), cy = cy0 + (small ? R * .38 : 0), rad = R * (small ? .3 : .5);
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.fillStyle = col; ctx.fill();
+    const isSel = sel && sel.kind === 'unit' && sel.id === u.id;
+    ctx.lineWidth = isSel ? 3.5 : 2; ctx.strokeStyle = isSel ? '#ffe08a' : 'rgba(255,255,255,.85)'; ctx.stroke();
+    ctx.font = `${rad * 1.15}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(EMOJI[u.type], cx, cy + 1);
+    if (u.level > 0 && !small) {
+      const bx = cx + rad * .85, by = cy - rad * .85, br = Math.max(7, rad * .42);
+      ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fillStyle = u.pts > 0 && u.owner === me ? '#fff' : '#e8c15a'; ctx.fill(); ctx.strokeStyle = '#4a3a10'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#2a2008'; ctx.font = `bold ${br * 1.15}px system-ui`; ctx.fillText(u.level, bx, by + .5);
+    }
+    if (!small && u.hp < u.hpMax || u.owner !== me) { const w = rad * 1.8; ctx.fillStyle = '#000b'; ctx.fillRect(cx - w / 2, cy + rad + 2, w, 4); ctx.fillStyle = hpColor(u.hp / u.hpMax); ctx.fillRect(cx - w / 2, cy + rad + 2, w * u.hp / u.hpMax, 4); }
+    if (u.owner === me && u.moves <= 0 && !u.hasAttacked && false) { /* reservado */ }
+    if (u.owner === me && (u.moves > 0 || u.pts > 0) && !u.fort && !u.goto && !S.players[me].ended && !small) { ctx.beginPath(); ctx.arc(cx - rad * .8, cy - rad * .8, 3.5, 0, 7); ctx.fillStyle = '#5fd08a'; ctx.fill(); }
+    if (u.fort && u.owner === me) { ctx.font = `${rad * .7}px system-ui`; ctx.fillText('🛡️', cx - rad * .8, cy - rad * .8); }
+  }
+  // selección de ciudad / hover
+  if (sel && sel.kind === 'city') { const c = cityById(sel.id); if (c) { const [cx, cy] = w2s(...hexCenter(c.x, c.y)); hexPath(cx, cy, R * .98); ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = 3.5; ctx.stroke(); } }
+  if (hover && hover[0] >= 0 && hover[1] >= 0 && hover[0] < W && hover[1] < H && S.v[hover[1] * W + hover[0]] !== '0') {
+    const [cx, cy] = w2s(...hexCenter(hover[0], hover[1])); hexPath(cx, cy, R); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // efectos flotantes
+  let anim = false;
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const f = floats[i], p = (now - f.t0) / 1500; if (p >= 1) { floats.splice(i, 1); continue; }
+    anim = true; const [cx, cy] = w2s(...hexCenter(f.x, f.y));
+    ctx.globalAlpha = 1 - p * p; ctx.font = `bold ${Math.max(13, 18 * cam.z)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(f.text, cx, cy - R * .4 - p * 38 * cam.z); ctx.fillStyle = f.color; ctx.fillText(f.text, cx, cy - R * .4 - p * 38 * cam.z); ctx.globalAlpha = 1;
+  }
+  if (anim) dirty = true;
+}
+function drawTerrainDetail(t, x, y, cx, cy, R) {
+  ctx.save();
+  if (t === 'f') {
+    ctx.fillStyle = 'rgba(20,60,25,.85)';
+    for (const [ox, oy] of [[-.35, .2], [.1, .32], [.32, -.15], [-.1, -.28]]) { const px = cx + ox * R, py = cy + oy * R; ctx.beginPath(); ctx.moveTo(px, py - R * .3); ctx.lineTo(px + R * .17, py + R * .1); ctx.lineTo(px - R * .17, py + R * .1); ctx.closePath(); ctx.fill(); }
+  } else if (t === 'h') {
+    ctx.strokeStyle = 'rgba(70,50,15,.55)'; ctx.lineWidth = 2;
+    for (const [ox, oy] of [[-.28, .1], [.25, -.12]]) { ctx.beginPath(); ctx.arc(cx + ox * R, cy + oy * R + R * .22, R * .3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+  } else if (t === 'm') {
+    ctx.fillStyle = 'rgba(55,56,66,.95)'; ctx.beginPath(); ctx.moveTo(cx, cy - R * .55); ctx.lineTo(cx + R * .5, cy + R * .35); ctx.lineTo(cx - R * .5, cy + R * .35); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f2f4f8'; ctx.beginPath(); ctx.moveTo(cx, cy - R * .55); ctx.lineTo(cx + R * .17, cy - R * .22); ctx.lineTo(cx - R * .17, cy - R * .22); ctx.closePath(); ctx.fill();
+  } else if (t === 'w') {
+    ctx.strokeStyle = 'rgba(255,255,255,.13)'; ctx.lineWidth = 1.5;
+    for (const oy of [-.15, .2]) { ctx.beginPath(); ctx.moveTo(cx - R * .4, cy + oy * R); ctx.quadraticCurveTo(cx - R * .2, cy + oy * R - R * .12, cx, cy + oy * R); ctx.quadraticCurveTo(cx + R * .2, cy + oy * R + R * .12, cx + R * .4, cy + oy * R); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function loop(now) { if (dirty) { dirty = false; draw(now); } requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+// ---------------------------------------------------------- entrada
+let drag = null;
+cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false, btn: e.button }; });
+cv.addEventListener('pointermove', (e) => {
+  const r = cv.getBoundingClientRect();
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
+    if (drag.moved) { cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; cv.classList.add('dragging'); dirty = true; }
+  }
+  const h = pickHex(e.clientX - r.left, e.clientY - r.top);
+  if (!hover || h[0] !== hover[0] || h[1] !== hover[1]) { hover = h; dirty = true; renderHover(); }
+});
+cv.addEventListener('pointerup', (e) => {
+  cv.classList.remove('dragging');
+  if (drag && !drag.moved) {
+    const r = cv.getBoundingClientRect(); const [x, y] = pickHex(e.clientX - r.left, e.clientY - r.top);
+    if (drag.btn === 2) { sel = null; reach.clear(); targets.clear(); renderPanel(); dirty = true; } else onTile(x, y);
+  }
+  drag = null;
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', (e) => {
+  e.preventDefault(); const r = cv.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const [bx, by] = s2w(sx, sy); cam.z = Math.max(.35, Math.min(2.2, cam.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  const [ax, ay] = s2w(sx, sy); cam.x += bx - ax; cam.y += by - ay; dirty = true;
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!S || S.phase === 'lobby' || e.target.tagName === 'INPUT') return;
+  const k = e.key; const st = 40 / cam.z;
+  if (k === 'Enter') { e.preventDefault(); endTurn(); }
+  else if (k === ' ') { e.preventDefault(); nextUnit(); }
+  else if (k === 'Escape') { sel = null; reach.clear(); targets.clear(); renderPanel(); dirty = true; }
+  else if (k === 'f' || k === 'F') { if (sel && sel.kind === 'unit') act({ type: 'found', unitId: sel.id }); }
+  else if (k === 'h' || k === 'H') { const c = S.cities.find(c => c.owner === me); if (c) centerOn(c.x, c.y); }
+  else if (k === 'ArrowLeft' || k === 'a') { cam.x -= st; dirty = true; } else if (k === 'ArrowRight' || k === 'd') { cam.x += st; dirty = true; }
+  else if (k === 'ArrowUp' || k === 'w') { cam.y -= st; dirty = true; } else if (k === 'ArrowDown' || k === 's') { cam.y += st; dirty = true; }
+  else if (k === '+' || k === '=') { cam.z = Math.min(2.2, cam.z * 1.1); dirty = true; } else if (k === '-') { cam.z = Math.max(.35, cam.z / 1.1); dirty = true; }
+});
+
+function thingsAt(x, y) {
+  const own = S.units.filter(u => u.x === x && u.y === y && u.owner === me);
+  const out = [];
+  const mil = own.find(u => !cfg.UNIT_TYPES[u.type].civil), civ = own.find(u => cfg.UNIT_TYPES[u.type].civil);
+  if (mil) out.push({ kind: 'unit', id: mil.id }); if (civ) out.push({ kind: 'unit', id: civ.id });
+  const c = S.cities.find(c => c.x === x && c.y === y) || [...seenCities.values()].find(c => c.x === x && c.y === y && S.v[y * S.W + x] === '1');
+  if (c && c.owner === me) out.push({ kind: 'city', id: c.id });
+  for (const u of S.units.filter(u => u.x === x && u.y === y && u.owner !== me)) out.push({ kind: 'unit', id: u.id });
+  if (c && c.owner !== me) out.push({ kind: 'city', id: c.id });
+  return out;
+}
+function onTile(x, y) {
+  if (!S || S.phase !== 'playing' || x < 0 || y < 0 || x >= S.W || y >= S.H) return;
+  const k = y * S.W + x;
+  if (S.v[k] === '0') return;
+  const su = sel && sel.kind === 'unit' ? unitById(sel.id) : null;
+  if (su && su.owner === me && !me_().ended) {
+    if (targets.has(k)) { act({ type: 'attack', unitId: su.id, x, y }); return; }
+    if (reach.has(k)) { act({ type: 'move', unitId: su.id, x, y }); return; }
+  }
+  const things = thingsAt(x, y);
+  if (things.length) {
+    const i = things.findIndex(t => sel && t.kind === sel.kind && t.id === sel.id);
+    select(things[(i + 1) % things.length]); return;
+  }
+  // casilla vacía lejana: orden de movimiento de varios turnos
+  if (su && su.owner === me && su.moves > 0 && !me_().ended && 'gfh'.includes(S.t[k])) { act({ type: 'move', unitId: su.id, x, y }); return; }
+  sel = null; reach.clear(); targets.clear(); renderPanel(); dirty = true;
+}
+function renderHover() {
+  const el = $('#hover'); if (!S || !hover || hover[0] < 0 || hover[1] < 0 || hover[0] >= S.W || hover[1] >= S.H) { el.classList.add('hidden'); return; }
+  const k = hover[1] * S.W + hover[0]; if (S.v[k] === '0') { el.classList.add('hidden'); return; }
+  const t = cfg.TERR[S.t[k]]; const d = t.def > 1 ? ` · defensa +${Math.round((t.def - 1) * 100)}%` : '';
+  el.textContent = t.name + (t.pass ? ` · coste de movimiento ${t.cost}` : ' · impasable') + d + (S.v[k] === '1' ? ' · (fuera de visión)' : '');
+  el.classList.remove('hidden');
+}
+
+boot();
+</script>
+</body>
+</html>
