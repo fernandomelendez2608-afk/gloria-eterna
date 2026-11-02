@@ -1,0 +1,9 @@
+{
+  "name": "gloria-eterna",
+  "version": "0.1.0",
+  "description": "Estrategia por turnos tipo Civ con unidades de crecimiento libre (promociones sin límite). Multijugador.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node test.js && node e2e.js" },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
